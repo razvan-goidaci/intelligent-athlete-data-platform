@@ -96,5 +96,5 @@ def organise_fit_files(data_dir=DATA_DIR, output_dir=OUTPUT_DIR):
 
     print(f"\nFinished organising {len(fit_files)} FIT files.")
 
-extract_files()
+extract_files(data_dir=DATA_DIR)
 organise_fit_files(Path("data/raw/fit"), Path("data/raw"))

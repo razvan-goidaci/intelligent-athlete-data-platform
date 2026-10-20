@@ -1,7 +1,7 @@
 from pathlib import Path
+from fitparse import FitFile
 from collections import Counter
 from zipfile import ZipFile
-from fitparse import FitFile
 
 DATA_DIR = Path("data/raw/GarminExport")
 ACTIVITY_DIR = Path("data/raw/activity_fit_files")
