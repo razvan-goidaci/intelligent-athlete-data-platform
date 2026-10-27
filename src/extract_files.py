@@ -1,100 +1,78 @@
 from pathlib import Path
 from zipfile import ZipFile
 from io import BytesIO
-import shutil
-from fitparse import FitFile
+
 
 DATA_DIR = Path("data/raw/GarminExport.zip")
 OUTPUT_DIR = DATA_DIR.parent
 
 
-def count_total_items(data_dir):
-    """Count all files to be extracted, including nested ZIP contents."""
+def count_total_items(zip_file):
+    """Count all files contained in a ZIP, including files inside nested ZIPs."""
+    total = 0
 
-    total_files = 0
+    for item in zip_file.infolist():
+        if item.is_dir():
+            continue
 
-    with ZipFile(data_dir) as archive:
-        for item in archive.namelist():
-            if item.endswith("/"):
-                continue
+        total += 1
 
-            if item.lower().endswith(".zip"):
-                with archive.open(item) as nested_file:
-                    nested_data = nested_file.read()
+        if item.filename.lower().endswith(".zip"):
+            nested_data = zip_file.read(item)
+            with ZipFile(BytesIO(nested_data)) as nested_zip:
+                total += count_total_items(nested_zip)
 
-                total_files += count_total_items(BytesIO(nested_data))
-            else:
-                total_files += 1
-
-    return total_files
+    return total
 
 
-def extract_files(data_dir=DATA_DIR):
-    """Extract all files from Garmin export."""
+def extract_zip_contents(zip_file, output_dir):
+    """Extract files from a ZIP and recursively extract any nested ZIP archives."""
+    for item in zip_file.infolist():
+        if item.is_dir():
+            continue
 
-    total_items = count_total_items(data_dir)
-    processed = 0
+        filename = Path(item.filename)
 
-    def extract_archive(archive):
-        nonlocal processed
+        if filename.name == "":
+            continue
 
-        for item in archive.namelist():
-            if item.endswith("/"):
-                continue
+        if filename.suffix.lower() == ".zip":
+            nested_data = zip_file.read(item)
 
-            if item.lower().endswith(".zip"):
-                with archive.open(item) as nested_file:
-                    nested_data = nested_file.read()
+            with ZipFile(BytesIO(nested_data)) as nested_zip:
+                extract_zip_contents(nested_zip, output_dir)
 
-                with ZipFile(BytesIO(nested_data)) as nested_archive:
-                    extract_archive(nested_archive)
+            continue
 
-            else:
-                new_dir = Path(item).suffix.lstrip(".")
-                output_dir = OUTPUT_DIR / new_dir
-                output_dir.mkdir(parents=True, exist_ok=True)
+        suffix = filename.suffix.lower().lstrip(".")
 
-                with archive.open(item) as source:
-                    output_file = output_dir / Path(item).name
+        if not suffix:
+            suffix = "other"
 
-                    with open(output_file, "wb") as target:
-                        target.write(source.read())
+        destination_dir = output_dir / suffix
+        destination_dir.mkdir(parents=True, exist_ok=True)
 
-                processed += 1
-                percentage = processed / total_items * 100
-                print(f"\rExtracting: {percentage:.1f}%", end="")
+        destination = destination_dir / filename.name
 
-    with ZipFile(data_dir) as archive:
-        extract_archive(archive)
+        with destination.open("wb") as output_file:
+            output_file.write(zip_file.read(item))
 
-    print(f"\nExtraction complete. Processed {processed} of {total_items} files.")
 
-def organise_fit_files(data_dir=DATA_DIR, output_dir=OUTPUT_DIR):
-    """Organise extracted FIT files into a dedicated directory."""
-    fit_files = list(data_dir.rglob("*.fit"))
-    if not fit_files:
-        print(f"No FIT files found in: {data_dir.resolve()}")
+def extract_files(data_dir=DATA_DIR, output_dir=OUTPUT_DIR):
+    """Extract the Garmin export into raw data directories without modifying the source ZIP."""
+    if not data_dir.exists():
+        print(f"Source ZIP not found: {data_dir.resolve()}")
         return
 
-    for fit_file in fit_files:
-        fit_file_data = FitFile(str(fit_file))
-        file_id_messages = fit_file_data.get_messages("file_id")
+    with ZipFile(data_dir, "r") as zip_file:
+        total_items = count_total_items(zip_file)
 
-        fit_type = next(
-            (message.get_value("type") for message in file_id_messages),
-            None,
-        )
+        print(f"Total files in archive: {total_items}")
 
-        new_dir = (
-            output_dir / f"{fit_type}_fit_file"
-            if fit_type
-            else output_dir / "unknown_fit_file"
-        )
+        extract_zip_contents(zip_file, output_dir)
 
-        new_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy(fit_file, new_dir / fit_file.name)
+    print(f"Extraction completed: {output_dir.resolve()}")
 
-    print(f"\nFinished organising {len(fit_files)} FIT files.")
 
-extract_files(data_dir=DATA_DIR)
-organise_fit_files(Path("data/raw/fit"), Path("data/raw"))
+if __name__ == "__main__":
+    extract_files()
