@@ -129,7 +129,8 @@ Approximately **996,693** monitoring messages were profiled.
 
 | Field | Observed type | Observed range | Role |
 |---|---|---:|---|
-| `timestamp` | datetime | Longitudinal monitoring timestamp | Core |
+| `timestamp` | datetime | Full timestamp; present on 223,341 messages | Core |
+| `timestamp_16` | int | Truncated time; present on 773,352 messages | Core; needs reconstruction |
 | `activity_type` | int/string | Garmin activity categories | Core/supporting |
 | `active_calories` | int | 0–2,456 | Supporting |
 | `active_time` | float | 1–27,879 | Supporting |
@@ -145,6 +146,8 @@ Approximately **996,693** monitoring messages were profiled.
 
 Monitoring data is a different grain from activity records and must not be merged directly with activity records without an explicit temporal/relational rule.
 
+`heart_rate` has an observed minimum of 0. Whether 0 means no reading is not yet established, so it must not be treated as an ordinary measurement.
+
 ### `stress_level`
 
 Longitudinal stress observations associated with monitoring data.
@@ -154,7 +157,7 @@ Longitudinal stress observations associated with monitoring data.
 | `stress_level_time` | datetime | Monitoring timestamp | Core temporal field |
 | `stress_level_value` | int | -2–100 | Supporting |
 
-The value `-1` occurs and should be treated as a special/missing/unavailable state rather than an ordinary stress score.
+Negative values, including `-1` and `-2`, should be treated as special/missing/unavailable states rather than ordinary stress scores. Their exact meanings are not established.
 
 ### Type `49`
 
@@ -462,6 +465,8 @@ The final relational model should distinguish:
 
 No assumption should be made that all identifiers are globally unique until checked during ingestion.
 
+The number in a FIT filename is not an `activityId`: none of the 724 `activityId` values in `summarizedActivities` JSON match one. That file family is currently outside the retained JSON scope.
+
 ## 7. Temporal model
 
 The data contains several timestamp representations:
@@ -475,7 +480,11 @@ The data contains several timestamp representations:
 - JSON GMT timestamps;
 - JSON local dates/timestamps.
 
-The FIT profile spans timestamps from **2015-01-06** to **2026-10-03** at the retained-source level.
+Activity records span **2023-05-25** to **2026-09-28**, and monitoring timestamps span **2024-01-08** to **2026-10-03**.
+
+Earlier values appear only in `device_info.timestamp` (2015-01-06), `training_file.time_created` (2022-12-23) and `activity.local_timestamp` (1989-12-31, which looks like a FIT epoch placeholder). They do not extend the analytical date range.
+
+Monitoring messages that only have `timestamp_16` need their full time reconstructed during ingestion.
 
 The final model must explicitly define:
 

@@ -11,7 +11,10 @@ The preserved Garmin export is the source of truth.
 |---|---:|---|
 | FIT files | 12,872 | Primary raw source |
 | JSON files | 161 | Supporting/longitudinal source |
+| GPX files | 7 | Inventoried; no current analytical role established |
 | PNG files | 3 | Inventoried; no current analytical role established |
+| TXT files | 1 | Inventoried; no current analytical role established |
+| BAK files | 1 | Inventoried; no current analytical role established |
 
 The raw export contains nested ZIP archives. The original archive remains untouched.
 
@@ -76,7 +79,7 @@ The retained profile contains:
 - 3,541 files
 - 867,987 `stress_level` messages
 
-`stress_level_value` ranges from -2 to 100. `-1` occurs and must be treated as a special/unavailable value rather than an ordinary stress score.
+`stress_level_value` ranges from -2 to 100. Negative values, including `-1` and `-2`, must be treated as special/unavailable values rather than ordinary stress scores. Their exact meanings are not established.
 
 ## 6. Supporting FIT sources
 
@@ -141,7 +144,21 @@ The retained profile contains multiple temporal representations:
 - JSON GMT timestamps
 - JSON calendar dates/local timestamps
 
-The retained profile includes observed timestamps from **2015-01-06** through **2026-10-03**.
+Observed date ranges differ by source:
+
+| Source field | Earliest | Latest |
+|---|---|---|
+| FIT `record.timestamp` | 2023-05-25 | 2026-09-28 |
+| FIT `monitoring.timestamp` | 2024-01-08 | 2026-10-03 |
+| JSON `daily_wellness` | 2023-05-24 | 2026-10-01 |
+| JSON `sleep` | 2024-01-08 | 2026-10-01 |
+| JSON `performance` | 2024-01-31 | 2026-10-01 |
+
+Three FIT fields fall outside the main analytical range and must not be used to describe its span:
+
+- `device_info.timestamp` has a minimum of 2015-01-06.
+- `training_file.time_created` has a minimum of 2022-12-23.
+- `activity.local_timestamp` has a minimum of 1989-12-31, which looks like a FIT epoch placeholder and needs verification.
 
 This is a November modeling problem, not an October reason to guess a canonical timezone. The ingestion layer must explicitly define timestamp and date semantics.
 
@@ -220,3 +237,13 @@ first processed datasets
 ```
 
 The next milestone is **not more broad reconnaissance**. It is reproducible ingestion and data modeling.
+
+## 13. Addendum: pre-ingestion checks (1 November 2026)
+
+These read-only checks answer or sharpen questions for November. They do not change the retained scope.
+
+- **Extraction is complete.** The master ZIP contains 13,045 files once nested archives are expanded, and 13,045 are on disk. No filenames collide, so the flat output folders lost nothing.
+- **Activity counts differ.** `summarizedActivities` JSON, currently in the dropped `low_level` family, lists 724 unique `activityId` values. There are 433 `activity` FIT files. The cause is not established.
+- **FIT filename numbers are not activity IDs.** No `activityId` equals the number in a FIT filename, so the filename cannot link the two sources. Start time is a candidate link and has not been tested.
+- **Most monitoring messages have no full timestamp.** Of 996,693 `monitoring` messages, 223,341 have `timestamp` and 773,352 have `timestamp_16`. Ingestion must reconstruct the full time for the latter, and that method has not been validated.
+- **Monitoring heart rate includes 0.** `monitoring.heart_rate` has a minimum of 0, which needs a decision on whether it means no reading.

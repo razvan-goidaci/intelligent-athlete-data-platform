@@ -221,8 +221,10 @@ __marimo__/
 
 # Data
 data/*
-!data/reports/
-!data/reports/**
+
+# Private plans and assistant instructions
+private/
+CLAUDE.md
 
 # macOS
 .DS_Store

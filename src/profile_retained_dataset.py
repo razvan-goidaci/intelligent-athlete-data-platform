@@ -45,6 +45,8 @@ EXCLUDED_JSON_PATTERNS = {
     ),
 }
 
+EXCLUDED_JSON_FIELDS = {"hydration"}
+
 
 def is_missing(value):
     return value is None or (
@@ -262,9 +264,7 @@ def merge_fit_profile(target, source):
             for value in field_data["distinct_values"]:
                 if len(target_field["distinct_values"]) >= 100:
                     break
-                target_field["distinct_values"].add(
-                    json.dumps(value, sort_keys=True)
-                )
+                target_field["distinct_values"].add(value)
 
 
 def profile_fit_directory(data_dir):
@@ -321,6 +321,9 @@ def classify_json_file(file_path):
 
 
 def profile_json_value(fields, path, value):
+    if path.split(".")[0] in EXCLUDED_JSON_FIELDS:
+        return
+
     if isinstance(value, dict):
         for name, nested_value in value.items():
             nested_path = f"{path}.{name}" if path else name
