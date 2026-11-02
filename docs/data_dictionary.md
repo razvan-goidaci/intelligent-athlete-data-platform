@@ -467,6 +467,8 @@ No assumption should be made that all identifiers are globally unique until chec
 
 The number in a FIT filename is not an `activityId`: none of the 724 `activityId` values in `summarizedActivities` JSON match one. That file family is currently outside the retained JSON scope.
 
+Start time links FIT and JSON activities: `session.start_time` matches `beginTimestamp`, converted from epoch milliseconds to UTC, exactly for 432 of the 433 FIT activities. Uniqueness and near matches still need checking in ingestion.
+
 ## 7. Temporal model
 
 The data contains several timestamp representations:
@@ -480,7 +482,7 @@ The data contains several timestamp representations:
 - JSON GMT timestamps;
 - JSON local dates/timestamps.
 
-Activity records span **2023-05-25** to **2026-09-28**, and monitoring timestamps span **2024-01-08** to **2026-10-03**.
+Activity records span **2023-05-25** to **2026-09-28**, and monitoring timestamps span **2024-01-08** to **2026-10-03**. These spans are not continuous: this export has a FIT gap of about a year starting on 2025-04-14 (see `docs/recon.md`, section 14).
 
 Earlier values appear only in `device_info.timestamp` (2015-01-06), `training_file.time_created` (2022-12-23) and `activity.local_timestamp` (1989-12-31, which looks like a FIT epoch placeholder). They do not extend the analytical date range.
 

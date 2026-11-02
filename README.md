@@ -25,6 +25,7 @@ Place the export at `data/raw/GarminExport.zip`, then run these from the reposit
 | `src/inventory.py` | Counts raw files and records JSON structure | `data/processed/inventory/` |
 | `src/reconnaissance.py` | Records FIT messages, FIT fields and JSON structure | `data/processed/reconnaissance/` |
 | `src/profile_retained_dataset.py` | Profiles the fields of the retained FIT and JSON sources | `data/processed/profiling/` |
+| `src/verify_activity_coverage.py` | Compares the JSON activity list with the FIT files and finds coverage gaps | `data/processed/validation/` |
 
 ## Documentation
 

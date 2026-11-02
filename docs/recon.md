@@ -243,7 +243,50 @@ The next milestone is **not more broad reconnaissance**. It is reproducible inge
 These read-only checks answer or sharpen questions for November. They do not change the retained scope.
 
 - **Extraction is complete.** The master ZIP contains 13,045 files once nested archives are expanded, and 13,045 are on disk. No filenames collide, so the flat output folders lost nothing.
-- **Activity counts differ.** `summarizedActivities` JSON, currently in the dropped `low_level` family, lists 724 unique `activityId` values. There are 433 `activity` FIT files. The cause is not established.
-- **FIT filename numbers are not activity IDs.** No `activityId` equals the number in a FIT filename, so the filename cannot link the two sources. Start time is a candidate link and has not been tested.
+- **FIT filename numbers are not activity IDs.** No `activityId` equals the number in a FIT filename, so the filename cannot link the two sources.
 - **Most monitoring messages have no full timestamp.** Of 996,693 `monitoring` messages, 223,341 have `timestamp` and 773,352 have `timestamp_16`. Ingestion must reconstruct the full time for the latter, and that method has not been validated.
 - **Monitoring heart rate includes 0.** `monitoring.heart_rate` has a minimum of 0, which needs a decision on whether it means no reading.
+
+## 14. Addendum: FIT coverage gap (2 November 2026)
+
+`src/verify_activity_coverage.py` reproduces the results below.
+
+### Activity linkage
+
+`summarizedActivities` JSON, currently in the dropped `low_level` family, lists 724 activities, compared with 433 `activity` FIT files. Comparing start times, after converting JSON epoch milliseconds to UTC:
+
+| Result | JSON activities |
+|---|---:|
+| Exact start-time match to a FIT activity | 432 |
+| Start within 5 minutes of a FIT activity | 2 |
+| No FIT activity | 290 |
+| **Total** | **724** |
+
+432 of the 433 FIT activities match exactly, and the remaining one is within 5 minutes of a JSON activity. Start time is therefore a strong link between the two sources. Whether each near match is the same activity has not been checked.
+
+### Missing FIT data
+
+The export's `DI-Connect-Uploaded-Files` folder contains `UploadedFiles` archives **Part1 and Part3, with no Part2**.
+
+| FIT type | Last file before gap | First file after gap | Days |
+|---|---|---|---:|
+| `activity` | 2025-04-14 | 2025-12-09, then 2026-05-06 | 239, then 147 |
+| `monitoring_b` | 2025-04-14 | 2026-05-03 | 383 |
+| `44` | 2025-04-14 | 2026-05-03 | 383 |
+| `49` | 2025-04-14 | 2026-05-05 | 386 |
+| `58` | 2025-04-14 | 2026-05-05 | 385 |
+| `68` | 2025-04-14 | 2026-05-06 | 386 |
+
+JSON daily wellness, sleep and activity summaries continue through this period.
+
+**Inference:** the missing Part2 most likely held these FIT files. This has not been confirmed against a new export. All FIT counts in this document describe the files present in this export, not the complete history.
+
+### Activities without FIT files
+
+Of the 290 activities with no FIT file:
+
+- 282 fall between April 2025 and May 2026, inside or next to the gap.
+- 7 fall in March 2025, all from one device and on days with the 7 GPX files. The GPX files may be their source, but this has not been confirmed.
+- 1 falls in July 2026 and is unexplained.
+
+These activities still have JSON summary values such as duration and distance, but no record-level time series in this export.
