@@ -26,6 +26,7 @@ Place the export at `data/raw/GarminExport.zip`, then run these from the reposit
 | `src/reconnaissance.py` | Records FIT messages, FIT fields and JSON structure | `data/processed/reconnaissance/` |
 | `src/profile_retained_dataset.py` | Profiles the fields of the retained FIT and JSON sources | `data/processed/profiling/` |
 | `src/verify_activity_coverage.py` | Compares the JSON activity list with the FIT files and finds coverage gaps | `data/processed/validation/` |
+| `src/verify_monitoring_timestamps.py` | Reconstructs and checks monitoring `timestamp_16` values | `data/processed/validation/` |
 
 ## Documentation
 

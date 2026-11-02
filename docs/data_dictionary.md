@@ -486,7 +486,7 @@ Activity records span **2023-05-25** to **2026-09-28**, and monitoring timestamp
 
 Earlier values appear only in `device_info.timestamp` (2015-01-06), `training_file.time_created` (2022-12-23) and `activity.local_timestamp` (1989-12-31, which looks like a FIT epoch placeholder). They do not extend the analytical date range.
 
-Monitoring messages that only have `timestamp_16` need their full time reconstructed during ingestion.
+Monitoring messages that only have `timestamp_16` need their full time reconstructed during ingestion. The method and its checks are in `docs/recon.md`, section 15.
 
 The final model must explicitly define:
 

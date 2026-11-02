@@ -244,7 +244,7 @@ These read-only checks answer or sharpen questions for November. They do not cha
 
 - **Extraction is complete.** The master ZIP contains 13,045 files once nested archives are expanded, and 13,045 are on disk. No filenames collide, so the flat output folders lost nothing.
 - **FIT filename numbers are not activity IDs.** No `activityId` equals the number in a FIT filename, so the filename cannot link the two sources.
-- **Most monitoring messages have no full timestamp.** Of 996,693 `monitoring` messages, 223,341 have `timestamp` and 773,352 have `timestamp_16`. Ingestion must reconstruct the full time for the latter, and that method has not been validated.
+- **Most monitoring messages have no full timestamp.** Of 996,693 `monitoring` messages, 223,341 have `timestamp` and 773,352 have `timestamp_16`. Ingestion must reconstruct the full time for the latter (see section 15).
 - **Monitoring heart rate includes 0.** `monitoring.heart_rate` has a minimum of 0, which needs a decision on whether it means no reading.
 
 ## 14. Addendum: FIT coverage gap (2 November 2026)
@@ -290,3 +290,25 @@ Of the 290 activities with no FIT file:
 - 1 falls in July 2026 and is unexplained.
 
 These activities still have JSON summary values such as duration and distance, but no record-level time series in this export.
+
+## 15. Addendum: monitoring timestamp reconstruction (2 November 2026)
+
+`src/verify_monitoring_timestamps.py` reproduces the results below.
+
+`timestamp_16` holds the low 16 bits of a FIT timestamp, so it repeats every 65,536 seconds, about 18.2 hours. The full time is the first time at or after the previous known time whose low 16 bits match:
+
+```text
+time = previous + ((timestamp_16 - previous) & 0xFFFF)
+```
+
+Garmin's forums attribute this formula to the FIT SDK's `MonitoringReader.java`. A Garmin representative has also said the field's use is not explained in their documentation, so the formula rests on those sources and the checks below.
+
+| Check, across 3,964 `monitoring_b` files | Result |
+|---|---|
+| `timestamp_16` values reconstructed | 773,352 of 773,352 |
+| Values with no earlier full timestamp in the file | 0 |
+| Full timestamps earlier than the preceding message's time | 0 of 219,377 |
+| Hidden test: full timestamps recomputed from their low 16 bits | 219,377 of 219,377 exact |
+| Times more than one day from the file's `time_created` | 0 |
+
+The strongest check is the third: every real timestamp is at or after the reconstructed time before it. The hidden test shows only that consecutive full timestamps are less than one rollover apart. A jump of more than 18.2 hours between two `timestamp_16` messages could not be detected from the field itself, though the one-day check limits how far such an error could go.
