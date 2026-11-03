@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This document defines the current data dictionary for the retained Garmin source data after October reconnaissance and automated profiling.
+This document defines the current data dictionary for the retained Garmin source data, based on automated profiling of the November 2026 export.
 
 The dictionary is intentionally focused on fields that are relevant to the thesis data model, data-quality work, time-series analysis, anomaly detection, and athlete-performance analysis. Garmin/device metadata and unresolved proprietary fields are recorded separately rather than being treated as meaningful analytical variables without evidence.
 
@@ -12,25 +12,25 @@ The dictionary is intentionally focused on fields that are relevant to the thesi
 
 | Source | Files | Role |
 |---|---:|---|
-| `activity` | 433 | Core activity data |
-| `monitoring_b` | 3,964 | Longitudinal/background monitoring |
-| Type `49` | 659 | Supporting source; semantics still partly unresolved |
-| Type `68` | 598 | Supporting HRV-related source; semantics still partly unresolved |
-| Type `44` | 3,590 | Supporting metrics source; semantics still unresolved |
+| `activity` | 740 | Core activity data |
+| `monitoring_b` | 7,912 | Longitudinal/background monitoring |
+| Type `49` | 1,106 | Supporting source; semantics still partly unresolved |
+| Type `68` | 1,019 | Supporting HRV-related source; semantics still partly unresolved |
+| Type `44` | 7,263 | Supporting metrics source; semantics still unresolved |
 
-Total retained FIT files: **9,244**.
+Total retained FIT files: **18,040**.
 
-Excluded FIT files: **3,628**.
+Excluded FIT files: **7,108**.
 
 ### JSON
 
 | Family | Files | Role |
 |---|---:|---|
 | `daily_wellness` | 13 | Core daily longitudinal data |
-| `sleep` | 10 | Core recovery/sleep data |
-| `performance` | 14 | Supporting performance data |
+| `sleep` | 11 | Core recovery/sleep data |
+| `performance` | 15 | Supporting performance data |
 
-Total retained JSON files: **37**.
+Total retained JSON files: **39**.
 
 Hydration is explicitly excluded.
 
@@ -64,22 +64,22 @@ One session summary per activity.
 | `total_timer_time` | float | 8.932–26,026.003 | Core |
 | `total_calories` | int | 0–2,844 | Core |
 | `avg_heart_rate` | int | 74–164 | Core |
-| `max_heart_rate` | int | 75–189 | Core |
+| `max_heart_rate` | int | 75–203 | Core |
 | `num_laps` | int | 1–51 | Supporting |
 | `total_training_effect` | float | 0–5 | Supporting |
-| `max_cadence` | int | 0–140 | Activity-dependent |
+| `max_cadence` | int | 0–156 | Activity-dependent |
 | `avg_cadence` | int | 0–133 | Activity-dependent |
-| `max_power` | int | 0–1,078 | Activity-dependent |
+| `max_power` | int | 0–1,100 | Activity-dependent |
 | `avg_power` | int | 0–366 | Activity-dependent |
 | `total_ascent` | int | 0–9,804 | Activity-dependent |
 | `total_descent` | int | 0–10,672 | Activity-dependent |
 | `total_cycles` | int | 0–19,078 | Activity-dependent |
 | `total_work` | int | 0–2,454,700 | Activity-dependent |
-| `training_stress_score` | float | 0–184.3 | Supporting |
+| `training_stress_score` | float | 0–234 | Supporting |
 | `normalized_power` | int | 0–374 | Cycling/power activities |
-| `threshold_power` | int | 0–299 | Cycling/power activities |
-| `intensity_factor` | float | 0–0.844 | Cycling/power activities |
-| `enhanced_avg_speed` | float | 0–8.659 | Activity-dependent |
+| `threshold_power` | int | 0–301 | Cycling/power activities |
+| `intensity_factor` | float | 0–1.002 | Cycling/power activities |
+| `enhanced_avg_speed` | float | 0–11.074 | Activity-dependent |
 
 Fields that are absent or null for large portions of the activity set are not globally applicable and should remain nullable in the processed model.
 
@@ -87,27 +87,27 @@ Fields that are absent or null for large portions of the activity set are not gl
 
 Timestamped activity time-series observations.
 
-Approximately **1.27 million** record messages were profiled.
+**2,682,496** record messages were profiled.
 
 | Field | Observed type | Observed range | Role |
 |---|---|---:|---|
 | `timestamp` | datetime | Activity time-series timestamp | Primary time key |
-| `heart_rate` | int | 30–189 | Core |
+| `heart_rate` | int | 0–203 | Core; 0 needs a decision |
 | `distance` | float | 0–113,289.35 | Core where available |
 | `speed` | float | 0–23.157 | Activity-dependent |
 | `enhanced_speed` | float | 0–30.549 | Activity-dependent |
-| `cadence` | int | 0–140 | Activity-dependent |
+| `cadence` | int | 0–156 | Activity-dependent |
 | `fractional_cadence` | float | 0–0.5 | Activity-dependent |
-| `power` | int | 0–1,078 | Cycling/power activities |
+| `power` | int | 0–1,100 | Cycling/power activities |
 | `temperature` | int | 10–45 | Supporting |
-| `altitude` | float | -6.4–695.8 | Activity-dependent |
-| `enhanced_altitude` | float | -6.4–3,638.2 | Activity-dependent |
+| `altitude` | float | -7–695.8 | Activity-dependent |
+| `enhanced_altitude` | float | -7–3,638.2 | Activity-dependent |
 | `position_lat` | int | FIT encoded coordinate | Spatial |
 | `position_long` | int | FIT encoded coordinate | Spatial |
 | `resistance` | int | Observed 0 | Activity-dependent |
 | `left_right_balance` | int/string | 141–228 observed | Activity-dependent |
-| `vertical_oscillation` | float | 33.4–119.3 | Running-dependent |
-| `vertical_ratio` | float | 4.26–13.23 | Running-dependent |
+| `vertical_oscillation` | float | 33.4–121.8 | Running-dependent |
+| `vertical_ratio` | float | 3.99–13.23 | Running-dependent |
 
 `position_lat` and `position_long` are stored in FIT's encoded representation and must be converted during ingestion rather than treated as ordinary decimal coordinates.
 
@@ -125,28 +125,28 @@ The `lap` level should be retained as an intermediate analytical grain between `
 
 Longitudinal monitoring observations from `monitoring_b`.
 
-Approximately **996,693** monitoring messages were profiled.
+**1,717,174** monitoring messages were profiled.
 
 | Field | Observed type | Observed range | Role |
 |---|---|---:|---|
-| `timestamp` | datetime | Full timestamp; present on 223,341 messages | Core |
-| `timestamp_16` | int | Truncated time; present on 773,352 messages | Core; needs reconstruction |
+| `timestamp` | datetime | Full timestamp; present on 388,560 messages | Core |
+| `timestamp_16` | int | Truncated time; present on 1,328,614 messages | Core; needs reconstruction |
 | `activity_type` | int/string | Garmin activity categories | Core/supporting |
-| `active_calories` | int | 0–2,456 | Supporting |
+| `active_calories` | int | 0–2,533 | Supporting |
 | `active_time` | float | 1–27,879 | Supporting |
-| `cycles` | float | 0–9,393.5 | Supporting |
-| `distance` | float | 0–16,667.79 | Supporting |
-| `heart_rate` | int | 0–191 | Core |
-| `duration_min` | int | 3–1,440 | Supporting |
-| `steps` | int | 3–18,787 | Core/supporting |
+| `cycles` | float | 0–11,053 | Supporting |
+| `distance` | float | 0–18,688.98 | Supporting |
+| `heart_rate` | int | 0–198 | Core; 0 needs a decision |
+| `duration_min` | int | 0–1,440 | Supporting |
+| `steps` | int | 1–22,106 | Core/supporting |
 | `vigorous_activity_minutes` | int | 1–88 | Supporting |
-| `moderate_activity_minutes` | int | 1–61 | Supporting |
+| `moderate_activity_minutes` | int | 1–95 | Supporting |
 | `ascent` | float | 0–57.745 | Supporting |
-| `descent` | float | 0.001–43.6 | Supporting |
+| `descent` | float | 0–43.6 | Supporting |
 
 Monitoring data is a different grain from activity records and must not be merged directly with activity records without an explicit temporal/relational rule.
 
-`heart_rate` has an observed minimum of 0. Whether 0 means no reading is not yet established, so it must not be treated as an ordinary measurement.
+`heart_rate` has an observed minimum of 0, here and in `record`. Whether 0 means no reading is not yet established, so it must not be treated as an ordinary measurement.
 
 ### `stress_level`
 
@@ -238,7 +238,7 @@ This is relevant to the timestamp/timezone reconciliation problem and should be 
 
 Daily longitudinal wellness data.
 
-The retained files contain approximately 1,074 records.
+The retained files contain 1,106 records.
 
 | Field | Type | Role |
 |---|---|---|
@@ -322,7 +322,7 @@ Body Battery is Garmin-derived and should be treated as an observed Garmin metri
 
 #### Explicitly excluded nested data
 
-The `hydration.*` fields present inside `daily_wellness` are excluded from the thesis model.
+The `hydration.*` fields present inside `daily_wellness` are excluded from the thesis model and are not profiled.
 
 This includes:
 
@@ -337,7 +337,7 @@ These values are not retained because they do not provide suitable independent g
 
 ### `sleep`
 
-Sleep data contains approximately 971 records across ten exported files.
+Sleep data contains 1,003 records across eleven exported files, covering 989 distinct calendar dates.
 
 | Field | Type | Role |
 |---|---|---|
@@ -465,9 +465,9 @@ The final relational model should distinguish:
 
 No assumption should be made that all identifiers are globally unique until checked during ingestion.
 
-The number in a FIT filename is not an `activityId`: none of the 724 `activityId` values in `summarizedActivities` JSON match one. That file family is currently outside the retained JSON scope.
+The number in a FIT filename is not an `activityId`: none of the 748 `activityId` values in `summarizedActivities` JSON match one. That file family is currently outside the retained JSON scope, and needs a scope decision because it lists every activity.
 
-Start time links FIT and JSON activities: `session.start_time` matches `beginTimestamp`, converted from epoch milliseconds to UTC, exactly for 432 of the 433 FIT activities. Uniqueness and near matches still need checking in ingestion.
+Start time links FIT and JSON activities: `session.start_time` matches `beginTimestamp`, converted from epoch milliseconds to UTC, exactly for 739 of the 740 FIT activities. The other differs by 13 seconds. The linking rule is in `docs/recon.md`, section 13.
 
 ## 7. Temporal model
 
@@ -482,11 +482,13 @@ The data contains several timestamp representations:
 - JSON GMT timestamps;
 - JSON local dates/timestamps.
 
-Activity records span **2023-05-25** to **2026-09-28**, and monitoring timestamps span **2024-01-08** to **2026-10-03**. These spans are not continuous: this export has a FIT gap of about a year starting on 2025-04-14 (see `docs/recon.md`, section 14).
+Activity records span **2023-05-25** to **2026-11-01**, and monitoring timestamps span **2024-01-08** to **2026-11-02**.
 
-Earlier values appear only in `device_info.timestamp` (2015-01-06), `training_file.time_created` (2022-12-23) and `activity.local_timestamp` (1989-12-31, which looks like a FIT epoch placeholder). They do not extend the analytical date range.
+Earlier values appear only in `device_info.timestamp` (2015-01-06), `training_file.time_created` (2022-12-23) and `activity.local_timestamp`. They do not extend the analytical date range.
 
-Monitoring messages that only have `timestamp_16` need their full time reconstructed during ingestion. The method and its checks are in `docs/recon.md`, section 15.
+`activity.local_timestamp` ranges from 1989-12-31 to 2046-10-31. Neither limit is a plausible activity time, so this field must not be trusted until its behavior is verified.
+
+Monitoring messages that only have `timestamp_16` need their full time reconstructed during ingestion. The method and its checks are in `docs/recon.md`, section 14.
 
 The final model must explicitly define:
 
@@ -637,7 +639,7 @@ The final relational/analytical schema should preserve these grains rather than 
 
 ## 12. Current status
 
-The October reconnaissance has established:
+Reconnaissance has established:
 
 - retained source scope;
 - major FIT message structures;

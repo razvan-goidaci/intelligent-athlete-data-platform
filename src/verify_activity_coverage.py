@@ -140,7 +140,7 @@ def uploaded_file_archives(source_zip):
         for item in zip_file.infolist():
             part = re.search(r"UploadedFiles.*_(Part\d+)\.zip$", item.filename)
 
-            if part:
+            if part and "__MACOSX" not in item.filename:
                 with ZipFile(BytesIO(zip_file.read(item))) as nested_zip:
                     archives[part.group(1)] = sum(
                         name.lower().endswith(".fit")

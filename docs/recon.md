@@ -1,7 +1,9 @@
 # Garmin Data Reconnaissance
 
-**Checkpoint:** 27 October 2026  
-**Purpose:** Freeze the October source-understanding phase before November ingestion and data-model work.
+**Checkpoint:** 3 November 2026  
+**Purpose:** Record the understanding of the source data before ingestion and data-model work.
+
+All figures describe the current Garmin export, requested in November 2026. It replaced an earlier export that was missing one archive (see section 13).
 
 ## 1. Source inventory
 
@@ -9,37 +11,38 @@ The preserved Garmin export is the source of truth.
 
 | Source | Count | Current role |
 |---|---:|---|
-| FIT files | 12,872 | Primary raw source |
-| JSON files | 161 | Supporting/longitudinal source |
+| FIT files | 25,148 | Primary raw source |
+| JSON files | 172 | Supporting/longitudinal source |
 | GPX files | 7 | Inventoried; no current analytical role established |
 | PNG files | 3 | Inventoried; no current analytical role established |
 | TXT files | 1 | Inventoried; no current analytical role established |
 | BAK files | 1 | Inventoried; no current analytical role established |
 
-The raw export contains nested ZIP archives. The original archive remains untouched.
+The raw export contains nested ZIP archives. The master ZIP was re-zipped on macOS, so it also contains metadata files, which extraction skips. The ZIP remains untouched.
 
 ## 2. FIT classification
 
 | FIT type | Count | Decision |
 |---|---:|---|
-| `activity` | 433 | KEEP |
-| `monitoring_b` | 3,964 | KEEP |
-| `44` | 3,590 | SUPPORTING / REVIEW |
-| `49` | 659 | SUPPORTING / REVIEW |
-| `68` | 598 | SUPPORTING / REVIEW |
-| `58` | 3,165 | DROP for current scope |
-| `41` | 271 | DROP for current scope |
-| `79` | 148 | DROP for current scope |
-| `57` | 42 | DROP for current scope |
+| `monitoring_b` | 7,912 | KEEP |
+| `activity` | 740 | KEEP |
+| `44` | 7,263 | SUPPORTING / REVIEW |
+| `49` | 1,106 | SUPPORTING / REVIEW |
+| `68` | 1,019 | SUPPORTING / REVIEW |
+| `58` | 5,708 | DROP for current scope |
+| `41` | 651 | DROP for current scope |
+| `79` | 521 | DROP for current scope |
+| `57` | 225 | DROP for current scope |
 | `72` | 1 | DROP for current scope |
 | `74` | 1 | DROP for current scope |
-| **Total** | **12,872** | |
+| `segment_list` | 1 | DROP for current scope |
+| **Total** | **25,148** | |
 
 The numeric FIT identifiers are not treated as semantic names. The retained/supporting decisions are scope decisions based on observed structure, not claims that excluded types are universally useless.
 
 ### Retained profile
 
-The retained profile covers **9,244 FIT files**. The profile was generated after filtering by `file_id.type`; excluded FIT types were not fully profiled.
+The retained profile covers **18,040 FIT files**. The profile was generated after filtering by `file_id.type`; the 7,108 excluded FIT files were not fully profiled.
 
 ## 3. Activity structure
 
@@ -54,10 +57,10 @@ activity
 
 Observed retained profile:
 
-- `session`: 433 messages across 433 activity files.
-- `lap`: 2,116 messages across 373 activity files.
-- `record`: 1,267,008 messages across all 433 activity files.
-- `activity`: 433 activity-level messages.
+- `session`: 740 messages across 740 activity files, with one session per file.
+- `lap`: 3,942 messages across 680 activity files.
+- `record`: 2,682,496 messages across all 740 activity files.
+- `activity`: 740 activity-level messages.
 
 The `record` grain is the primary activity time-series source. Fields include timestamps, heart rate, distance, speed, cadence, power, temperature, altitude and encoded position fields, with strong activity-dependent sparsity.
 
@@ -65,8 +68,8 @@ The `record` grain is the primary activity time-series source. Fields include ti
 
 `monitoring_b` contains:
 
-- 3,964 files
-- 996,693 `monitoring` messages
+- 7,912 files
+- 1,717,174 `monitoring` messages
 
 Important observed fields include timestamp, activity type, heart rate, steps, distance, active time/calories and intensity-related measurements.
 
@@ -76,8 +79,8 @@ Monitoring is a separate longitudinal grain and must not be directly flattened i
 
 The retained profile contains:
 
-- 3,541 files
-- 867,987 `stress_level` messages
+- 6,327 files
+- 1,458,399 `stress_level` messages
 
 `stress_level_value` ranges from -2 to 100. Negative values, including `-1` and `-2`, must be treated as special/unavailable values rather than ordinary stress scores. Their exact meanings are not established.
 
@@ -99,36 +102,38 @@ No unresolved field is assigned a meaning without evidence.
 
 ## 7. JSON inventory
 
-The 161 JSON files were grouped into:
+The 172 JSON files were grouped into:
 
 | Family | Files | Decision |
 |---|---:|---|
 | `daily_wellness` | 13 | KEEP |
-| `sleep` | 10 | KEEP |
-| `performance` | 14 | SUPPORTING |
+| `sleep` | 11 | KEEP |
+| `performance` | 15 | SUPPORTING |
 | `hydration` | 13 | DROP |
-| `health_status` | 4 | DROP |
-| `environmental` | 10 | DROP |
-| `garmin_derived` | 53 | DROP |
-| `low_level` | 44 | DROP |
+| `health_status` | 5 | DROP |
+| `environmental` | 11 | DROP |
+| `garmin_derived` | 59 | DROP |
+| `low_level` | 45 | DROP, under review for `summarizedActivities` |
 
-The retained JSON scope is therefore **37 files**.
+The retained JSON scope is therefore **39 files**.
+
+`summarizedActivities`, currently part of `low_level`, is the only source found so far that lists every activity, so it needs a scope decision during ingestion design.
 
 ### Daily wellness
 
-Approximately 1,074 records were profiled. The useful grain is daily, with heart-rate summaries, activity duration, steps, distance, calories, stress, Body Battery and respiration.
+1,106 records were profiled. The useful grain is daily, with heart-rate summaries, activity duration, steps, distance, calories, stress, Body Battery and respiration.
 
-Nested hydration data is explicitly excluded. Garmin-estimated hydration/sweat-loss values are not suitable as independent ground truth for this thesis.
+Nested hydration data is explicitly excluded and is not profiled. Garmin-estimated hydration/sweat-loss values are not suitable as independent ground truth for this thesis.
 
 ### Sleep
 
-Approximately 971 records across 10 files.
+1,003 records across 11 files, covering 989 distinct calendar dates.
 
 Observed data includes sleep start/end, deep/light/REM/awake durations, respiration, sleep stress, sleep scores, awakenings, restlessness and naps.
 
 ### Performance
 
-14 files containing VO2 Max, Max MET and fitness-age-related Garmin-derived observations.
+15 files containing VO2 Max, Max MET and fitness-age-related Garmin-derived observations.
 
 These remain supporting observations, not independent ground truth.
 
@@ -148,19 +153,19 @@ Observed date ranges differ by source:
 
 | Source field | Earliest | Latest |
 |---|---|---|
-| FIT `record.timestamp` | 2023-05-25 | 2026-09-28 |
-| FIT `monitoring.timestamp` | 2024-01-08 | 2026-10-03 |
-| JSON `daily_wellness` | 2023-05-24 | 2026-10-01 |
-| JSON `sleep` | 2024-01-08 | 2026-10-01 |
-| JSON `performance` | 2024-01-31 | 2026-10-01 |
+| FIT `record.timestamp` | 2023-05-25 | 2026-11-01 |
+| FIT `monitoring.timestamp` | 2024-01-08 | 2026-11-02 |
+| JSON `daily_wellness` | 2023-05-24 | 2026-11-02 |
+| JSON `sleep` | 2024-01-08 | 2026-11-02 |
+| JSON `performance` | 2024-01-31 | 2026-11-02 |
 
 Three FIT fields fall outside the main analytical range and must not be used to describe its span:
 
 - `device_info.timestamp` has a minimum of 2015-01-06.
 - `training_file.time_created` has a minimum of 2022-12-23.
-- `activity.local_timestamp` has a minimum of 1989-12-31, which looks like a FIT epoch placeholder and needs verification.
+- `activity.local_timestamp` ranges from 1989-12-31 to 2046-10-31. These limits are not plausible activity times, so this field must not be trusted until its behavior is verified. The minimum looks like a FIT epoch placeholder.
 
-This is a November modeling problem, not an October reason to guess a canonical timezone. The ingestion layer must explicitly define timestamp and date semantics.
+This is a modeling problem to solve explicitly, not a reason to guess a canonical timezone. The ingestion layer must define timestamp and date semantics.
 
 ## 9. Missingness and sparsity
 
@@ -176,11 +181,13 @@ Therefore:
 
 > missing does not automatically mean invalid.
 
-The December quality layer must distinguish not-applicable, unavailable, explicit null, malformed and unexpected missingness.
+The quality layer must distinguish not-applicable, unavailable, explicit null, malformed and unexpected missingness.
+
+Both `monitoring.heart_rate` and `record.heart_rate` have a minimum of 0, which needs a decision on whether it means no reading.
 
 ## 10. Relationships and identifiers
 
-Candidate identifiers are now known:
+Candidate identifiers are:
 
 - FIT source filename
 - FIT `file_id.number`
@@ -192,13 +199,9 @@ Candidate identifiers are now known:
 - JSON `deviceId`
 - JSON `calendarDate`
 
-Global uniqueness and cross-source relationships are **not yet proven** and belong to November ingestion/model validation.
+The number in a FIT filename is not an `activityId`, so filenames cannot link FIT and JSON activities. Start time can (see section 13). Global uniqueness of the remaining identifiers is not yet proven and belongs to ingestion and model validation.
 
-## 11. October conclusion
-
-The October objective was to understand the source data before designing the pipeline.
-
-That objective is complete.
+## 11. Conclusion
 
 We now have:
 
@@ -214,15 +217,14 @@ We now have:
 - sleep/recovery/performance source identification;
 - major temporal representations;
 - sparsity patterns;
-- candidate identifiers;
+- a verified link between FIT and JSON activities;
+- a verified method for monitoring timestamps;
 - unresolved-field limitations;
 - first data dictionary.
 
-No final anomaly-detection problem has been forced. No proprietary `unknown_*` fields have been assigned invented semantics.
+No proprietary `unknown_*` fields have been assigned invented semantics.
 
-## 12. November handoff
-
-November starts from the following concrete problem:
+## 12. Next steps
 
 ```text
 raw Garmin export
@@ -238,62 +240,65 @@ first processed datasets
 
 The next milestone is **not more broad reconnaissance**. It is reproducible ingestion and data modeling.
 
-## 13. Addendum: pre-ingestion checks (1 November 2026)
+## 13. Export completeness and activity linkage
 
-These read-only checks answer or sharpen questions for November. They do not change the retained scope.
+`src/verify_activity_coverage.py` reproduces the coverage results below.
 
-- **Extraction is complete.** The master ZIP contains 13,045 files once nested archives are expanded, and 13,045 are on disk. No filenames collide, so the flat output folders lost nothing.
-- **FIT filename numbers are not activity IDs.** No `activityId` equals the number in a FIT filename, so the filename cannot link the two sources.
-- **Most monitoring messages have no full timestamp.** Of 996,693 `monitoring` messages, 223,341 have `timestamp` and 773,352 have `timestamp_16`. Ingestion must reconstruct the full time for the latter (see section 15).
-- **Monitoring heart rate includes 0.** `monitoring.heart_rate` has a minimum of 0, which needs a decision on whether it means no reading.
+### Why the export was replaced
 
-## 14. Addendum: FIT coverage gap (2 November 2026)
+The earlier export contained `UploadedFiles` archives Part1 and Part3, with no Part2, and every regular FIT type had a gap of about a year from 14 April 2025. The current export contains all three, and the gap is gone, which confirms that the missing archive was the cause.
 
-`src/verify_activity_coverage.py` reproduces the results below.
+| Archive | FIT files |
+|---|---:|
+| `UploadedFiles` Part1 | 8,494 |
+| `UploadedFiles` Part2 | 11,500 |
+| `UploadedFiles` Part3 | 5,152 |
+
+Extraction wrote 25,332 files with no name collisions, and none of the archives was corrupt.
+
+Before the earlier export was deleted, it was compared with the current one. No wellness, sleep, health-status or hydration day and no activity was missing from the current export. 14 FIT files of the out-of-scope type `41` were absent, for reasons not investigated, and 30 files had changed. Of those, 3 daily-wellness records differed, and the current values are used.
+
+### Remaining FIT gaps
+
+Gaps of 30 days or more in FIT file creation times:
+
+| FIT type | After | Before | Days | Interpretation |
+|---|---|---|---:|---|
+| `activity` | 2024-03-20 | 2024-05-05 | 46 | JSON lists no activities either, so most likely no activities were recorded |
+| `44` | 2023-09-30 | 2024-01-08 | 100 | Not established |
+| `57` | 2025-06-07 | 2025-07-11 | 34 | Not established; this type is irregular and out of scope |
+| `57` | 2025-11-18 | 2026-02-18 | 91 | As above |
+| `57` | 2026-02-18 | 2026-06-03 | 104 | As above |
+
+`monitoring_b`, `49`, `58` and `68` have no such gaps. Monitoring begins on 2024-01-08, so it does not cover the first months of activity data.
 
 ### Activity linkage
 
-`summarizedActivities` JSON, currently in the dropped `low_level` family, lists 724 activities, compared with 433 `activity` FIT files. Comparing start times, after converting JSON epoch milliseconds to UTC:
+`summarizedActivities` JSON lists 748 activities, compared with 740 `activity` FIT files. Comparing start times, after converting JSON epoch milliseconds to UTC:
 
 | Result | JSON activities |
 |---|---:|
-| Exact start-time match to a FIT activity | 432 |
-| Start within 5 minutes of a FIT activity | 2 |
-| No FIT activity | 290 |
-| **Total** | **724** |
+| Exact start-time match to a FIT activity | 739 |
+| Start within 5 minutes of a FIT activity | 1 |
+| No FIT activity | 8 |
+| **Total** | **748** |
 
-432 of the 433 FIT activities match exactly, and the remaining one is within 5 minutes of a JSON activity. Start time is therefore a strong link between the two sources. Whether each near match is the same activity has not been checked.
+All 740 FIT activities therefore link to a JSON activity: 739 exactly, and one with a 13-second difference. That last one is most likely the same activity, though this has not been confirmed. Its FIT sport is `generic`, while its JSON type is `mountain_biking`, so sport labels cannot confirm a link.
 
-### Missing FIT data
-
-The export's `DI-Connect-Uploaded-Files` folder contains `UploadedFiles` archives **Part1 and Part3, with no Part2**.
-
-| FIT type | Last file before gap | First file after gap | Days |
-|---|---|---|---:|
-| `activity` | 2025-04-14 | 2025-12-09, then 2026-05-06 | 239, then 147 |
-| `monitoring_b` | 2025-04-14 | 2026-05-03 | 383 |
-| `44` | 2025-04-14 | 2026-05-03 | 383 |
-| `49` | 2025-04-14 | 2026-05-05 | 386 |
-| `58` | 2025-04-14 | 2026-05-05 | 385 |
-| `68` | 2025-04-14 | 2026-05-06 | 386 |
-
-JSON daily wellness, sleep and activity summaries continue through this period.
-
-**Inference:** the missing Part2 most likely held these FIT files. This has not been confirmed against a new export. All FIT counts in this document describe the files present in this export, not the complete history.
+**Linking rule:** match exact start times first. Allow a tolerance only for activities still unmatched, and link each FIT file to at most one JSON activity. A tolerance alone is unsafe, because separate activities can start seconds apart.
 
 ### Activities without FIT files
 
-Of the 290 activities with no FIT file:
-
-- 282 fall between April 2025 and May 2026, inside or next to the gap.
-- 7 fall in March 2025, all from one device and on days with the 7 GPX files. The GPX files may be their source, but this has not been confirmed.
+- 7 fall in March 2025, all without a manufacturer value and on days with the 7 GPX files. The GPX files may be their source, but this has not been confirmed.
 - 1 falls in July 2026 and is unexplained.
 
-These activities still have JSON summary values such as duration and distance, but no record-level time series in this export.
+These activities still have JSON summary values, but no record-level time series in FIT.
 
-## 15. Addendum: monitoring timestamp reconstruction (2 November 2026)
+## 14. Monitoring timestamp reconstruction
 
 `src/verify_monitoring_timestamps.py` reproduces the results below.
+
+Of 1,717,174 `monitoring` messages, 388,560 have `timestamp` and 1,328,614 have `timestamp_16`.
 
 `timestamp_16` holds the low 16 bits of a FIT timestamp, so it repeats every 65,536 seconds, about 18.2 hours. The full time is the first time at or after the previous known time whose low 16 bits match:
 
@@ -303,12 +308,14 @@ time = previous + ((timestamp_16 - previous) & 0xFFFF)
 
 Garmin's forums attribute this formula to the FIT SDK's `MonitoringReader.java`. A Garmin representative has also said the field's use is not explained in their documentation, so the formula rests on those sources and the checks below.
 
-| Check, across 3,964 `monitoring_b` files | Result |
+| Check, across 7,912 `monitoring_b` files | Result |
 |---|---|
-| `timestamp_16` values reconstructed | 773,352 of 773,352 |
+| `timestamp_16` values reconstructed | 1,328,614 of 1,328,614 |
 | Values with no earlier full timestamp in the file | 0 |
-| Full timestamps earlier than the preceding message's time | 0 of 219,377 |
-| Hidden test: full timestamps recomputed from their low 16 bits | 219,377 of 219,377 exact |
+| Full timestamps earlier than the preceding message's time | 0 of 380,648 |
+| Hidden test: full timestamps recomputed from their low 16 bits | 380,642 of 380,648 exact |
 | Times more than one day from the file's `time_created` | 0 |
 
-The strongest check is the third: every real timestamp is at or after the reconstructed time before it. The hidden test shows only that consecutive full timestamps are less than one rollover apart. A jump of more than 18.2 hours between two `timestamp_16` messages could not be detected from the field itself, though the one-day check limits how far such an error could go.
+The strongest check is the third: every real timestamp is at or after the time before it, including reconstructed times.
+
+The hidden test only shows whether consecutive times are less than one rollover apart. Its 6 failures are real gaps of 18.4 to 20.9 hours, longer than the 18.2-hour rollover. They do no harm at those points, because those messages carry a full timestamp. They do show that gaps this long occur, so a similar gap between two `timestamp_16` messages would come out about 18.2 hours too early, and could not be detected from the field itself. The one-day check limits how far such an error could go.

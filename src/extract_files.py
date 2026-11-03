@@ -7,12 +7,22 @@ DATA_DIR = Path("data/raw/GarminExport.zip")
 OUTPUT_DIR = DATA_DIR.parent
 
 
+def is_macos_metadata(filename):
+    """Identify files macOS adds when zipping, which are not part of the export."""
+    path = Path(filename)
+    return (
+        "__MACOSX" in path.parts
+        or path.name.startswith("._")
+        or path.name == ".DS_Store"
+    )
+
+
 def count_total_items(zip_file):
     """Count all files contained in a ZIP, including files inside nested ZIPs."""
     total = 0
 
     for item in zip_file.infolist():
-        if item.is_dir():
+        if item.is_dir() or is_macos_metadata(item.filename):
             continue
 
         total += 1
@@ -28,7 +38,7 @@ def count_total_items(zip_file):
 def extract_zip_contents(zip_file, output_dir):
     """Extract files from a ZIP and recursively extract any nested ZIP archives."""
     for item in zip_file.infolist():
-        if item.is_dir():
+        if item.is_dir() or is_macos_metadata(item.filename):
             continue
 
         filename = Path(item.filename)
