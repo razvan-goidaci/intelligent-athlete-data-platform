@@ -113,11 +113,11 @@ The 172 JSON files were grouped into:
 | `health_status` | 5 | DROP |
 | `environmental` | 11 | DROP |
 | `garmin_derived` | 59 | DROP |
-| `low_level` | 45 | DROP, under review for `summarizedActivities` |
+| `low_level` | 45 | DROP, except the 3 `summarizedActivities` files (KEEP) |
 
-The retained JSON scope is therefore **39 files**.
+The retained JSON scope is therefore **42 files**.
 
-`summarizedActivities`, currently part of `low_level`, is the only source found so far that lists every activity, so it needs a scope decision during ingestion design.
+`summarizedActivities`, part of `low_level`, is the only source found that lists every activity. It was added to the retained scope in November 2026, during the Bronze design, because the link between JSON and FIT activities depends on it.
 
 ### Daily wellness
 

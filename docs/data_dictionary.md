@@ -29,8 +29,11 @@ Excluded FIT files: **7,108**.
 | `daily_wellness` | 13 | Core daily longitudinal data |
 | `sleep` | 11 | Core recovery/sleep data |
 | `performance` | 15 | Supporting performance data |
+| `summarizedActivities` | 3 | List of every activity; JSON side of the start-time link to FIT activities |
 
-Total retained JSON files: **39**.
+Total retained JSON files: **42**.
+
+`summarizedActivities` was added to the retained scope in November 2026, during the Bronze design. It is the only source found that lists every activity, and the link between JSON and FIT activities depends on it.
 
 Hydration is explicitly excluded.
 
@@ -439,6 +442,17 @@ The `fitnessAgeData` export contains biometric and derived fields including:
 
 These are supporting Garmin-derived metrics and should not automatically be treated as independent labels or ground truth.
 
+### `summarizedActivities`
+
+Lists 748 activities, one entry per activity.
+
+| Field | Type | Role |
+|---|---|---|
+| `activityId` | int | Activity identifier |
+| `beginTimestamp` | int | Activity start time, epoch milliseconds (UTC) |
+
+Only these two fields have been verified, by the activity coverage check (`docs/recon.md`, section 13). The family was not part of the retained-data profile, so its other fields have not been profiled yet.
+
 ## 6. Identifiers and relationships
 
 The current source contains several candidate identifiers:
@@ -448,7 +462,7 @@ The current source contains several candidate identifiers:
 | FIT file name | FIT | Source-file provenance |
 | `file_id.number` | FIT | FIT file identifier where available |
 | `file_id.serial_number` | FIT | Device identifier |
-| `activityId` | JSON performance | Activity relationship |
+| `activityId` | JSON `summarizedActivities`, `performance` | Activity relationship |
 | `activityUuid.uuid` | JSON performance | Activity relationship |
 | `userProfilePK` | JSON | User identifier |
 | `deviceId` | JSON | Device identifier |
@@ -465,7 +479,7 @@ The final relational model should distinguish:
 
 No assumption should be made that all identifiers are globally unique until checked during ingestion.
 
-The number in a FIT filename is not an `activityId`: none of the 748 `activityId` values in `summarizedActivities` JSON match one. That file family is currently outside the retained JSON scope, and needs a scope decision because it lists every activity.
+The number in a FIT filename is not an `activityId`: none of the 748 `activityId` values in `summarizedActivities` JSON match one.
 
 Start time links FIT and JSON activities: `session.start_time` matches `beginTimestamp`, converted from epoch milliseconds to UTC, exactly for 739 of the 740 FIT activities. The other differs by 13 seconds. The linking rule is in `docs/recon.md`, section 13.
 
