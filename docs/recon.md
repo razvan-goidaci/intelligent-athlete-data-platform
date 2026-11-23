@@ -1,6 +1,6 @@
 # Garmin Data Reconnaissance
 
-**Checkpoint:** 3 November 2026  
+**Checkpoint:** 3 November 2026, updated 23 November 2026 with the numeric-type and linkage findings  
 **Purpose:** Record the understanding of the source data before ingestion and data-model work.
 
 All figures describe the current Garmin export, requested in November 2026. It replaced an earlier export that was missing one archive (see section 13).
@@ -26,9 +26,9 @@ The raw export contains nested ZIP archives. The master ZIP was re-zipped on mac
 |---|---:|---|
 | `monitoring_b` | 7,912 | KEEP |
 | `activity` | 740 | KEEP |
-| `44` | 7,263 | SUPPORTING / REVIEW |
-| `49` | 1,106 | SUPPORTING / REVIEW |
-| `68` | 1,019 | SUPPORTING / REVIEW |
+| `44` | 7,263 | DROP (November 2026, see section 6) |
+| `49` | 1,106 | KEEP: sleep |
+| `68` | 1,019 | KEEP: heart-rate variability |
 | `58` | 5,708 | DROP for current scope |
 | `41` | 651 | DROP for current scope |
 | `79` | 521 | DROP for current scope |
@@ -42,7 +42,9 @@ The numeric FIT identifiers are not treated as semantic names. The retained/supp
 
 ### Retained profile
 
-The retained profile covers **18,040 FIT files**. The profile was generated after filtering by `file_id.type`; the 7,108 excluded FIT files were not fully profiled.
+The retained profile covers **18,040 FIT files**, the retained scope at the time, which included type `44`. The profile was generated after filtering by `file_id.type`; the 7,108 excluded FIT files were not fully profiled. With type `44` removed, the retained scope is **10,777 FIT files**.
+
+The profile was produced with the `fitparse` library, which only knows FIT message numbers up to 268 and reports higher ones as `unknown_<number>`. Section 6 adds the official names from Garmin's FIT profile (version 21.221.0) where they exist.
 
 ## 3. Activity structure
 
@@ -82,23 +84,25 @@ The retained profile contains:
 - 6,327 files
 - 1,458,399 `stress_level` messages
 
-`stress_level_value` ranges from -2 to 100. Negative values, including `-1` and `-2`, must be treated as special/unavailable values rather than ordinary stress scores. Their exact meanings are not established.
+`stress_level_value` ranges from -2 to 100. Negative values, including `-1` and `-2`, must be treated as special/unavailable values rather than ordinary stress scores. The working interpretation is in `docs/data_dictionary.md`, section 3.
 
-## 6. Supporting FIT sources
+## 6. Numeric FIT types
 
-### Type `49`
+Types `44`, `49` and `68` are not defined in Garmin's official FIT profile. In November 2026 their messages were compared with the profile's message definitions, across all files of each type.
 
-The profile exposes structures such as `unknown_273`, `unknown_346`, `unknown_275` and `unknown_382`. Their semantics are not established.
+### Type `49`: sleep
 
-### Type `68`
+Night files (1,025) contain `sleep_level` (`fitparse`: `unknown_275`) and `sleep_assessment` (`unknown_346`), both defined in the official profile, plus the undefined `unknown_273` and `unknown_382`. Nap files (81) contain only `nap_event` (`unknown_412`). Every type-49 file is one of the two kinds. Details are in `docs/data_dictionary.md`, section 3.
 
-Retained as an HRV-related supporting source, but the current profile does not provide enough reliable semantic mapping to freeze a core schema.
+### Type `68`: heart-rate variability
 
-### Type `44`
+All 1,019 files contain `hrv_status_summary` (`unknown_370`) and `timestamp_correlation`; 1,003 contain `hrv_value` (`unknown_371`), the official "5 minute RMSSD". The undefined `unknown_22` is also in every file.
 
-Retained as a supporting metrics source. Its current profile contains substantial unresolved `unknown_*` structure.
+### Type `44`: dropped
 
-No unresolved field is assigned a meaning without evidence.
+Of 20 message types, only `max_met_data` (`unknown_229`) is defined in the official profile, and it most likely duplicates the retained JSON Max MET data. The type was removed from the scope.
+
+Messages the official profile does not define are not assigned a meaning.
 
 ## 7. JSON inventory
 
@@ -163,7 +167,7 @@ Three FIT fields fall outside the main analytical range and must not be used to 
 
 - `device_info.timestamp` has a minimum of 2015-01-06.
 - `training_file.time_created` has a minimum of 2022-12-23.
-- `activity.local_timestamp` ranges from 1989-12-31 to 2046-10-31. These limits are not plausible activity times, so this field must not be trusted until its behavior is verified. The minimum looks like a FIT epoch placeholder.
+- `activity.local_timestamp` ranges from 1989-12-31 to 2046-10-31. The minimum comes from 38 activities where the field is 0, the FIT epoch, meaning not set. The maximum comes from 11 activities whose value differs from `timestamp` by more than any timezone allows. The other 691 give a valid timezone offset. Details are in `docs/data_dictionary.md`, section 7.
 
 This is a modeling problem to solve explicitly, not a reason to guess a canonical timezone. The ingestion layer must define timestamp and date semantics.
 
@@ -183,7 +187,7 @@ Therefore:
 
 The quality layer must distinguish not-applicable, unavailable, explicit null, malformed and unexpected missingness.
 
-Both `monitoring.heart_rate` and `record.heart_rate` have a minimum of 0, which needs a decision on whether it means no reading.
+Both `monitoring.heart_rate` and `record.heart_rate` have a minimum of 0. The working interpretation is a missed reading, which Silver treats as missing (`docs/data_dictionary.md`, section 3).
 
 ## 10. Relationships and identifiers
 
@@ -265,7 +269,7 @@ Gaps of 30 days or more in FIT file creation times:
 | FIT type | After | Before | Days | Interpretation |
 |---|---|---|---:|---|
 | `activity` | 2024-03-20 | 2024-05-05 | 46 | JSON lists no activities either, so most likely no activities were recorded |
-| `44` | 2023-09-30 | 2024-01-08 | 100 | Not established |
+| `44` | 2023-09-30 | 2024-01-08 | 100 | Most likely the period before the wearable was in regular use: the gap ends on the day `monitoring_b`, type `49` and type `68` files begin, from the same device product. Type `44` is now out of scope. |
 | `57` | 2025-06-07 | 2025-07-11 | 34 | Not established; this type is irregular and out of scope |
 | `57` | 2025-11-18 | 2026-02-18 | 91 | As above |
 | `57` | 2026-02-18 | 2026-06-03 | 104 | As above |
@@ -283,14 +287,14 @@ Gaps of 30 days or more in FIT file creation times:
 | No FIT activity | 8 |
 | **Total** | **748** |
 
-All 740 FIT activities therefore link to a JSON activity: 739 exactly, and one with a 13-second difference. That last one is most likely the same activity, though this has not been confirmed. Its FIT sport is `generic`, while its JSON type is `mountain_biking`, so sport labels cannot confirm a link.
+All 740 FIT activities therefore link to a JSON activity: 739 exactly, and one with a 13-second difference. That last one is the same activity, on strong evidence: its FIT elapsed time and distance equal the JSON duration and distance exactly, with JSON distance in centimetres and duration in milliseconds. Its FIT sport is `generic`, while its JSON type is `mountain_biking`, so sport labels cannot confirm a link.
 
 **Linking rule:** match exact start times first. Allow a tolerance only for activities still unmatched, and link each FIT file to at most one JSON activity. A tolerance alone is unsafe, because separate activities can start seconds apart.
 
 ### Activities without FIT files
 
-- 7 fall in March 2025, all without a manufacturer value and on days with the 7 GPX files. The GPX files may be their source, but this has not been confirmed.
-- 1 falls in July 2026 and is unexplained.
+- 7 fall in March 2025, all without a manufacturer value. Each starts at exactly the time of the first track point of one of the 7 GPX files, so the GPX files are their source, on strong evidence. GPX is out of scope, so these activities have only their JSON summary.
+- 1 falls in July 2026 and is unexplained. It has a device and manufacturer but no FIT or GPX file. It is kept as a known gap: an activity with a summary but no time series.
 
 These activities still have JSON summary values, but no record-level time series in FIT.
 

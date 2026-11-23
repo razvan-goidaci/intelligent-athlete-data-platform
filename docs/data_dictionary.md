@@ -4,6 +4,8 @@
 
 This document defines the current data dictionary for the retained Garmin source data, based on automated profiling of the November 2026 export.
 
+The reconnaissance and profiling used the `fitparse` library, whose built-in FIT profile only knows message numbers up to 268. Higher-numbered messages appear in its output as `unknown_<number>`. Where Garmin's official FIT profile (version 21.221.0, published in Garmin's `fit-python-sdk` repository) defines such a message, this dictionary gives the official name. The Bronze pipeline parses with Garmin's official SDK instead (see `docs/bronze_design.md`).
+
 The dictionary is intentionally focused on fields that are relevant to the thesis data model, data-quality work, time-series analysis, anomaly detection, and athlete-performance analysis. Garmin/device metadata and unresolved proprietary fields are recorded separately rather than being treated as meaningful analytical variables without evidence.
 
 ## 2. Retained source scope
@@ -14,13 +16,14 @@ The dictionary is intentionally focused on fields that are relevant to the thesi
 |---|---:|---|
 | `activity` | 740 | Core activity data |
 | `monitoring_b` | 7,912 | Longitudinal/background monitoring |
-| Type `49` | 1,106 | Supporting source; semantics still partly unresolved |
-| Type `68` | 1,019 | Supporting HRV-related source; semantics still partly unresolved |
-| Type `44` | 7,263 | Supporting metrics source; semantics still unresolved |
+| Type `49` | 1,106 | Sleep: night and nap files (see section 3) |
+| Type `68` | 1,019 | Nightly heart-rate variability (see section 3) |
 
-Total retained FIT files: **18,040**.
+Total retained FIT files: **10,777**.
 
-Excluded FIT files: **7,108**.
+Excluded FIT files: **14,371**.
+
+Type `44` (7,263 files) was removed from the retained scope in November 2026. Of its 20 message types, only one is defined in Garmin's official profile, `max_met_data`, which most likely duplicates the retained JSON Max MET data. The other 19 have no documented meaning.
 
 ### JSON
 
@@ -149,7 +152,9 @@ Longitudinal monitoring observations from `monitoring_b`.
 
 Monitoring data is a different grain from activity records and must not be merged directly with activity records without an explicit temporal/relational rule.
 
-`heart_rate` has an observed minimum of 0, here and in `record`. Whether 0 means no reading is not yet established, so it must not be treated as an ordinary measurement.
+`heart_rate` has an observed minimum of 0, here and in `record`. It occurs 4,832 times among 1,165,920 monitoring heart-rate values, and 23 times among 2,640,399 record heart-rate values, always mid-activity. Garmin's official profile documents no meaning for 0 in these two messages. It does document 0 as "blank" for the heart-rate field of a related message (`hsa_heart_rate_data`). A heart rate of 0 is not physiologically possible in a living athlete.
+
+**Working interpretation:** 0 is a missed reading. Silver treats it as missing and counts it as a data-quality issue. How missing values are then handled (excluded or filled) is a Silver design decision.
 
 ### `stress_level`
 
@@ -160,33 +165,47 @@ Longitudinal stress observations associated with monitoring data.
 | `stress_level_time` | datetime | Monitoring timestamp | Core temporal field |
 | `stress_level_value` | int | -2–100 | Supporting |
 
-Negative values, including `-1` and `-2`, should be treated as special/missing/unavailable states rather than ordinary stress scores. Their exact meanings are not established.
+Of 1,458,399 stress values, 132,698 are `-1`, 168,045 are `-2` and 2,719 are `0`: about one in five is not a score. Garmin's official profile describes `stress_level_value` as a value "from 1 to 100 calculated by FirstBeat", and documents no meaning for negative values in this message. For a related message (`hsa_stress_data`), it documents `-1` as off wrist and `-2` as excess motion.
 
-### Type `49`
+**Working interpretation:** `-1`, `-2` and `0` mean no valid stress reading. Silver stores them as a status, not as a score. The `-1` and `-2` meanings are taken by analogy with `hsa_stress_data` and are not confirmed for this message.
 
-The source contains several message structures with fields currently exposed by `fitparse` as `unknown_*`.
+Stress is a Garmin-derived score, which Garmin describes as based on heart-rate variability. It is supporting data, not ground truth.
 
-Observed structures include `unknown_273`, `unknown_346`, `unknown_275`, and `unknown_382`.
+### Type `49`: sleep
 
-The automated profile shows that several fields contain stable numeric values, including fields in `unknown_346` ranging approximately from 0–100.
+Type `49` is not defined in Garmin's official profile, but its contents identify it as sleep data. Every file is one of two kinds:
 
-**Semantic interpretation is not yet frozen.** These fields must not receive invented names or meanings in the processed model.
+| Kind | Files | Messages |
+|---|---:|---|
+| Night | 1,025 | `sleep_level` (fitparse: `unknown_275`), `sleep_assessment` (`unknown_346`), `event`, and the undefined `unknown_273` and `unknown_382` |
+| Nap | 81 | `nap_event` (`unknown_412`) |
 
-### Type `68`
+`unknown_521` appears in 404 files and is not defined in the official profile.
 
-The type was retained as a supporting HRV-related source.
+| Message | Official definition |
+|---|---|
+| `sleep_level` | `timestamp`, `sleep_level` (sleep stage) |
+| `sleep_assessment` | Sleep scores 0–100 (overall, quality, duration, recovery, deep, REM, light, awake time, awakenings, restlessness, interruptions), `awakenings_count`, `average_stress_during_sleep` |
 
-The current automated profile exposes proprietary/unknown fields rather than sufficiently reliable semantic names.
+The device writes `sleep_assessment` fields 0–16, while the official definition covers fields 0–11, 14 and 15; the extra fields are undocumented.
 
-**Semantic interpretation is not yet frozen.** The source is retained because it may provide useful recovery/HRV information, but it is not yet part of the core analytical schema.
+Files cover 992 distinct days, close to the 989 dated JSON sleep records.
 
-### Type `44`
+### Type `68`: heart-rate variability
 
-The type was retained as supporting metrics data.
+Type `68` is not defined in Garmin's official profile, but its contents identify it as nightly heart-rate variability (HRV) data. All 1,019 files contain:
 
-Its current profile is dominated by unresolved `unknown_*` fields.
+| Message | Official definition |
+|---|---|
+| `hrv_status_summary` (fitparse: `unknown_370`) | Weekly average, last-night average, last-night 5-minute high, baseline bands (ms), and an HRV status |
+| `hrv_value` (`unknown_371`) | One value per 5 minutes: "5 minute RMSSD", in ms |
+| `timestamp_correlation` | UTC, system and local time (see section 4) |
 
-**Semantic interpretation is not yet frozen.** It should not be promoted into the core model until its fields are mapped with sufficient evidence.
+`unknown_22` also appears in every file and is not defined in the official profile.
+
+The device writes `hrv_status_summary` fields 0–8, while the official definition covers fields 0–6; the extra fields are undocumented.
+
+`hrv_value` has 92,056 messages in 1,003 files, about 90 per night. Files cover 989 distinct days. No retained JSON source has an HRV field, so type `68` is the only HRV source in scope.
 
 ## 4. FIT metadata
 
@@ -500,7 +519,16 @@ Activity records span **2023-05-25** to **2026-11-01**, and monitoring timestamp
 
 Earlier values appear only in `device_info.timestamp` (2015-01-06), `training_file.time_created` (2022-12-23) and `activity.local_timestamp`. They do not extend the analytical date range.
 
-`activity.local_timestamp` ranges from 1989-12-31 to 2046-10-31. Neither limit is a plausible activity time, so this field must not be trusted until its behavior is verified.
+`activity.local_timestamp` ranges from 1989-12-31 to 2046-10-31. Both limits are explained by a minority of values:
+
+| `local_timestamp` compared with `timestamp` | Activities |
+|---|---:|
+| Differs by a whole number of hours within ±14 h (a valid timezone offset) | 691 |
+| Equals 0, the FIT epoch (1989-12-31), meaning not set | 38 |
+| Differs by more than 14 h (no valid timezone) | 11 |
+| **Total** | **740** |
+
+Garmin's official profile defines the field as the timestamp "expressed in local time, used to convert activity timestamps to local time". It is usable as a local-time offset for the 691 activities with a valid offset only. `summarizedActivities` also provides `startTimeLocal`, `startTimeGmt` and `timeZoneId` for every activity.
 
 Monitoring messages that only have `timestamp_16` need their full time reconstructed during ingestion. The method and its checks are in `docs/recon.md`, section 14.
 
@@ -540,18 +568,17 @@ The data-quality layer should distinguish:
 
 ## 9. Unresolved fields
 
-Fields named `unknown_*` are retained in the reconnaissance output but are not assigned invented semantics.
+Messages and fields that Garmin's official profile does not define keep their `unknown_*` names and are not assigned invented semantics. They are not loaded into Bronze.
 
-The highest-priority unresolved areas are:
+FIT types `49` and `68` were identified in November 2026 from the official message definitions (section 3), and type `44` left the scope.
 
-1. FIT type `49`;
-2. FIT type `68` / HRV-related data;
-3. FIT type `44`;
-4. timestamp/timezone relationships;
-5. exact units for fields used in the processed schema;
-6. identifier relationships between FIT and JSON data.
+The remaining unresolved areas are:
 
-These are the remaining items that matter for November data modeling.
+1. timestamp/timezone relationships;
+2. exact units for fields used in the processed schema;
+3. the fields of `summarizedActivities` beyond `activityId` and `beginTimestamp`, to be profiled when Silver selects them.
+
+The FIT-to-JSON activity link is resolved by start time (section 6).
 
 ## 10. Current analytical core
 

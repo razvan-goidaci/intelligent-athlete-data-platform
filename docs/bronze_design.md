@@ -50,9 +50,34 @@ Bronze loads only the retained source scope defined in `docs/data_dictionary.md`
 - **Why:** the platform has a defined scope, and loading data outside it adds tables nobody uses. Bronze filters which sources it loads, but it never changes the values it loads.
 - **Trade-off:** if the scope widens later, the new sources have to be ingested again from the export ZIP. Nothing is lost, because the ZIP is kept.
 
+## Decision: FIT parser
+
+Bronze parses FIT files with Garmin's official Python SDK, `garmin-fit-sdk`, rather than `fitparse`.
+
+- **Problem:** `fitparse` 1.2.0 knows message numbers only up to 268. Garmin's official FIT profile documents many higher ones that appear in this export, such as `sleep_assessment` (346), `hrv_value` (371) and `respiration_rate` (297). `fitparse` reports them as `unknown_*`, without field names, units or scaling.
+- **Options:** keep `fitparse`; keep `fitparse` and maintain a mapping to official names by hand; or use `garmin-fit-sdk`.
+- **Decision:** `garmin-fit-sdk`. It provides the official names, units and scaling directly from Garmin's profile, and the Bronze code is not written yet, so switching costs nothing extra.
+- **Not changed:** the existing verification scripts keep using `fitparse`. Their results are already recorded in `docs/recon.md`.
+- **Check on first run:** message counts from `garmin-fit-sdk` must match the `fitparse` counts in `docs/recon.md`. Any difference has to be explained before either is trusted.
+
+### Decoder options
+
+The rule for each option: after it is applied, can we still tell exactly what the device wrote? If yes, it is decoding and stays on in Bronze. If no, it is a transformation and belongs in Silver, where it is a documented decision.
+
+| Option | Bronze | Reason |
+|---|---|---|
+| `apply_scale_and_offset` | on | Decoding: applies the scale and offset from Garmin's profile. |
+| `convert_datetimes_to_dates` | on | Decoding: FIT seconds become datetimes. |
+| `convert_types_to_strings` | on | Decoding: enum numbers become their profile names. |
+| `expand_sub_fields` | on | Decoding: adds the documented meaning of a field whose meaning depends on another field. Kept on only if the original field is also kept; to be verified on the first run. |
+| `expand_components` | off | Creates new fields, some of them accumulated from earlier messages in the file, which is a calculation across rows. |
+| `merge_heart_rates` | off | Copies heart rates from `hr` messages into `record` rows the device did not write them to. Afterwards, original and copied values cannot be told apart. |
+
+The option names come from the SDK's documentation and are confirmed when the SDK is installed.
+
 ## FIT tables
 
-Each table is named after the message name the parser reports. Bronze does not rename messages, including `unknown_*` messages in the numeric file types, because a meaningful name would be an interpretation. Silver can give a message a meaningful name once its meaning is established with evidence.
+Each table is named after the message's name in the official FIT profile. A message the profile does not define is named `unknown_<number>`, after its message number. Bronze does not give undefined messages a meaningful name, because that would be an interpretation. Silver can name them once their meaning is established with evidence.
 
 | Table | One row is | Why it is kept |
 |---|---|---|
@@ -60,16 +85,21 @@ Each table is named after the message name the parser reports. Bronze does not r
 | `lap` | One `lap` message | Grain between session and record |
 | `record` | One `record` message | Activity time series |
 | `activity` | One `activity` message | Activity-level metadata |
+| `event` | One `event` message | Start, stop and pause markers. Needed to tell a pause in an activity apart from missing data. |
 | `monitoring` | One `monitoring` message | Background monitoring time series |
 | `stress_level` | One `stress_level` message | Stress time series |
-| `unknown_*` | One message of that `unknown_*` type, one table per type | Supporting data from file types 49, 68 and 44; meaning not established. Type 49 contains `unknown_273`, `unknown_346`, `unknown_275` and `unknown_382`. |
+| `respiration_rate` | One `respiration_rate` message | All-day breathing-rate time series |
+| `sleep_level` | One `sleep_level` message | Sleep-stage timeline through the night. JSON sleep has only the stage totals. |
+| `sleep_assessment` | One `sleep_assessment` message | Sleep scores. Also in JSON sleep; the two sources can be checked against each other. |
+| `hrv_value` | One `hrv_value` message | Heart-rate variability every 5 minutes during the night. The only HRV source in scope. |
+| `hrv_status_summary` | One `hrv_status_summary` message | Nightly HRV summary and baseline |
 | `file_id` | One `file_id` message, so one per file | File-level metadata: creation time, device serial number, raw file type |
 | `device_info` | One `device_info` message | Device, sensor and firmware provenance. A change in device or sensor can explain a shift in the data that is not a change in the athlete. |
 | `timestamp_correlation` | One `timestamp_correlation` message | Raw material for the timestamp and timezone strategy. Needed as evidence before the time model is decided. |
 
 Bronze loads only the message types in this table, even when a retained file contains others. The scope rule applies at every level: file types, message types and fields.
 
-**Open:** the `unknown_*` message names in file types 68 and 44 are not yet listed. Until they are, no messages from those file types are loaded.
+Messages the official profile does not define are not loaded, so Bronze has no `unknown_*` tables. Their meaning cannot be established from any official source, and none is needed by the coach. If that changes, they can be ingested again from the export ZIP.
 
 ## JSON tables
 
@@ -86,7 +116,7 @@ Each JSON table holds one kind of record. A row is one element of the file's arr
 
 - **Why `performance` is three tables:** it contains three record structures with different fields. One table would mix rows that mean different things, which is the same problem that led to one table per message type for FIT.
 - **Hydration:** the nested `hydration` object in `daily_wellness` is not loaded, because hydration is out of scope. This removes a field. It does not change any value that is kept.
-- **Performance rows:** a new record most likely appears each time Garmin recalculates the metric, for example after a workout. This is an inference, not verified. Max MET has several records on some dates, and VO2 Max records carry an `activityId`.
+- **Performance rows:** every VO2 Max record carries an `activityId` that exists in `summarizedActivities`, so a VO2 Max row is most likely one value computed from one activity. Max MET records come in two categories, `CYCLING` and `GENERIC`, and most repeated dates hold one record of each. Fitness age has one record per date. These are inferences from the record structure, not documented by Garmin.
 - **`summarizedActivities`:** the records are not at the top level of the file but in the array under the key `summarizedActivitiesExport`.
 - **Data observations for Silver:** some sleep records have no `calendarDate`, and some Max MET dates have more than one record. Bronze keeps these as they are.
 
