@@ -101,6 +101,8 @@ Each table is named after the message's name in the official FIT profile. A mess
 
 Bronze loads only the message types in this table, even when a retained file contains others. The scope rule applies at every level: file types, message types and fields.
 
+The same applies to fields: a field the official profile does not define is not loaded, even inside a defined message. For example, `record` messages in this export carry several such fields, which the SDK reports by field number instead of a name. Undefined fields beyond a message's official definition, such as the extra fields in `sleep_assessment` and `hrv_status_summary`, are dropped the same way.
+
 Messages the official profile does not define are not loaded, so Bronze has no `unknown_*` tables. Their meaning cannot be established from any official source, and none is needed by the coach. If that changes, they can be ingested again from the export ZIP.
 
 ## JSON tables
