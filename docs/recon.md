@@ -44,7 +44,7 @@ The numeric FIT identifiers are not treated as semantic names. The retained/supp
 
 The retained profile covers **18,040 FIT files**, the retained scope at the time, which included type `44`. The profile was generated after filtering by `file_id.type`; the 7,108 excluded FIT files were not fully profiled. With type `44` removed, the retained scope is **10,777 FIT files**.
 
-The profile was produced with the `fitparse` library, which only knows FIT message numbers up to 268 and reports higher ones as `unknown_<number>`. Section 6 adds the official names from Garmin's FIT profile (version 21.221.0) where they exist.
+The profile was produced with the `fitparse` library, whose FIT profile is older than Garmin's current one: it knows no message above number 268, and also lacks 13, 104, 211, 216 and 229. It reports messages it does not know as `unknown_<number>`. Section 6 adds the official names from Garmin's FIT profile (version 21.221.0) where they exist.
 
 ## 3. Activity structure
 

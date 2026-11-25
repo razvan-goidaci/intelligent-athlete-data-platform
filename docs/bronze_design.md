@@ -54,11 +54,13 @@ Bronze loads only the retained source scope defined in `docs/data_dictionary.md`
 
 Bronze parses FIT files with Garmin's official Python SDK, `garmin-fit-sdk`, rather than `fitparse`.
 
-- **Problem:** `fitparse` 1.2.0 knows message numbers only up to 268. Garmin's official FIT profile documents many higher ones that appear in this export, such as `sleep_assessment` (346), `hrv_value` (371) and `respiration_rate` (297). `fitparse` reports them as `unknown_*`, without field names, units or scaling.
+- **Problem:** `fitparse` 1.2.0 knows no message number above 268, and also lacks a few lower ones (13, 104, 211, 216, 229). Garmin's official FIT profile documents many of these that appear in this export, such as `sleep_assessment` (346), `hrv_value` (371) and `respiration_rate` (297). `fitparse` reports them as `unknown_*`, without field names, units or scaling.
 - **Options:** keep `fitparse`; keep `fitparse` and maintain a mapping to official names by hand; or use `garmin-fit-sdk`.
 - **Decision:** `garmin-fit-sdk`. It provides the official names, units and scaling directly from Garmin's profile, and the Bronze code is not written yet, so switching costs nothing extra.
 - **Not changed:** the existing verification scripts keep using `fitparse`. Their results are already recorded in `docs/recon.md`.
-- **Check on first run:** message counts from `garmin-fit-sdk` must match the `fitparse` counts in `docs/recon.md`. Any difference has to be explained before either is trusted.
+- **Cross-check (done, 25 November 2026):** `src/check_sdk_message_counts.py` decodes every FIT file with `garmin-fit-sdk` 21.221.0, using the decoder options below, and counts messages per type in the 10,777 retained files. Every count matches `fitparse`: the core counts in `docs/recon.md` (`record` 2,682,496, `session` 740, `lap` 3,942, `monitoring` 1,717,174, `stress_level` 1,458,399, `activity` 740), and every other message type, including those `fitparse` reports as `unknown_*` (for example `hrv_value` 92,056, `sleep_level` 21,190, `respiration_rate` 1,466,586). The two parsers find the same messages; the SDK adds the official names.
+- **Limit of the cross-check:** equal counts do not show equal values. Some values differ by design: for messages `fitparse` does not know, it returns raw integers, while the SDK applies the profile's scale and offset. Values are checked by the Bronze verification step instead.
+- **Requirement for the Bronze load:** the count check did not inspect the decoder's `errors`. The Bronze load must record decode errors per file, as a data-quality signal.
 
 ### Decoder options
 
@@ -69,11 +71,11 @@ The rule for each option: after it is applied, can we still tell exactly what th
 | `apply_scale_and_offset` | on | Decoding: applies the scale and offset from Garmin's profile. |
 | `convert_datetimes_to_dates` | on | Decoding: FIT seconds become datetimes. |
 | `convert_types_to_strings` | on | Decoding: enum numbers become their profile names. |
-| `expand_sub_fields` | on | Decoding: adds the documented meaning of a field whose meaning depends on another field. Kept on only if the original field is also kept; to be verified on the first run. |
+| `expand_sub_fields` | on | Decoding: adds the documented meaning of a field whose meaning depends on another field. The SDK's source adds the sub-field as a new field and keeps the original. |
 | `expand_components` | off | Creates new fields, some of them accumulated from earlier messages in the file, which is a calculation across rows. |
 | `merge_heart_rates` | off | Copies heart rates from `hr` messages into `record` rows the device did not write them to. Afterwards, original and copied values cannot be told apart. |
 
-The option names come from the SDK's documentation and are confirmed when the SDK is installed.
+The option names were confirmed against `garmin-fit-sdk` 21.221.0, the pinned version, which matches the profile version cited in `docs/data_dictionary.md`.
 
 ## FIT tables
 

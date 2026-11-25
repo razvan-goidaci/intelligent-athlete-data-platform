@@ -4,7 +4,7 @@
 
 This document defines the current data dictionary for the retained Garmin source data, based on automated profiling of the November 2026 export.
 
-The reconnaissance and profiling used the `fitparse` library, whose built-in FIT profile only knows message numbers up to 268. Higher-numbered messages appear in its output as `unknown_<number>`. Where Garmin's official FIT profile (version 21.221.0, published in Garmin's `fit-python-sdk` repository) defines such a message, this dictionary gives the official name. The Bronze pipeline parses with Garmin's official SDK instead (see `docs/bronze_design.md`).
+The reconnaissance and profiling used the `fitparse` library, whose built-in FIT profile is older than Garmin's current one. It knows no message above number 268, and also lacks 13, 104, 211, 216 and 229. Messages it does not know appear in its output as `unknown_<number>`. Where Garmin's official FIT profile (version 21.221.0, published in Garmin's `fit-python-sdk` repository) defines such a message, this dictionary gives the official name. The Bronze pipeline parses with Garmin's official SDK instead (see `docs/bronze_design.md`).
 
 The dictionary is intentionally focused on fields that are relevant to the thesis data model, data-quality work, time-series analysis, anomaly detection, and athlete-performance analysis. Garmin/device metadata and unresolved proprietary fields are recorded separately rather than being treated as meaningful analytical variables without evidence.
 
