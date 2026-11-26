@@ -246,7 +246,7 @@ The next milestone is **not more broad reconnaissance**. It is reproducible inge
 
 ## 13. Export completeness and activity linkage
 
-`src/verify_activity_coverage.py` reproduces the coverage results below.
+`src/recon/verify_activity_coverage.py` reproduces the coverage results below.
 
 ### Why the export was replaced
 
@@ -300,7 +300,7 @@ These activities still have JSON summary values, but no record-level time series
 
 ## 14. Monitoring timestamp reconstruction
 
-`src/verify_monitoring_timestamps.py` reproduces the results below.
+`src/recon/verify_monitoring_timestamps.py` reproduces the results below.
 
 Of 1,717,174 `monitoring` messages, 388,560 have `timestamp` and 1,328,614 have `timestamp_16`.
 
