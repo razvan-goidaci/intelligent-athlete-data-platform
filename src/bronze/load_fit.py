@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime, timezone
+from collections import defaultdict
 
 from delta import configure_spark_with_delta_pip
 from pyspark.sql import SparkSession
@@ -27,27 +28,25 @@ if __name__ == "__main__":
 
     spark = create_spark()
 
-    session_rows = []
-    activity_files_found = 0
+    rows_by_table = defaultdict(list)
     load_time = datetime.now(timezone.utc)
 
-    for fit_file in sorted(FIT_DIR.glob("*.fit")):
+    for fit_file in sorted(FIT_DIR.glob("*.fit"))[::50]:
         fit_rows = file_to_rows(fit_file, export_sha256="test", loaded_at=load_time)
         
-        if "session" in fit_rows:
-            session_rows.extend(fit_rows["session"])
-            activity_files_found += 1
-        if activity_files_found == 5:
-            break
+        for table_name, table_rows in fit_rows.items():
+            rows_by_table[table_name].extend(table_rows)
 
-    df = spark.createDataFrame(session_rows)
+    for table_name in rows_by_table:
+        df = spark.createDataFrame(rows_by_table[table_name])
 
-    df.printSchema()
-    print(df.count())
+        print(table_name)
+        df.printSchema()
+        print(df.count())
 
-    df.write.format("delta").mode("overwrite").save(str(BRONZE_PATH / "session"))
+        df.write.format("delta").mode("overwrite").save(str(BRONZE_PATH / table_name))
 
-    session_table = spark.read.format("delta").load(str(BRONZE_PATH / "session"))
-    print(session_table.count())
+        file_table = spark.read.format("delta").load(str(BRONZE_PATH / table_name))
+        print(file_table.count())
 
     spark.stop()

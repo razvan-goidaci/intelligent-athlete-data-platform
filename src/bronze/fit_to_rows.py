@@ -11,6 +11,34 @@ BRONZE_FIT_TABLES = {
     "file_id", "device_info", "timestamp_correlation",
 }
 
+# In Profile["types"], but really numbers with a few named special values.
+NUMERIC_PROFILE_TYPES = {
+    "date_time",
+    "local_date_time",
+    "message_index",
+    "left_right_balance",
+    "left_right_balance_100",
+}
+
+RETAINED_FILE_TYPES = {
+    "activity",
+    "monitoring_b",
+    49,  # sleep (proprietary, no profile name)
+    68,  # HRV (proprietary, no profile name)
+}
+
+def field_types_for(mesg_num):
+    """Return {field name: profile type} for one message number."""
+    field_types = {}
+
+    for field in Profile["messages"][mesg_num]["fields"].values():
+        field_types[field["name"]] = field["type"]
+
+        for sub_field in field["sub_fields"]:
+            field_types[sub_field["name"]] = sub_field["type"]
+
+    return field_types
+
 def file_to_rows(path, export_sha256, loaded_at):
     """Return {table_name: [row, row, ...]} for one FIT file."""
     messages_in_order = []
@@ -36,6 +64,9 @@ def file_to_rows(path, export_sha256, loaded_at):
         
     file_type = messages["file_id_mesgs"][0]["type"]
 
+    if file_type not in RETAINED_FILE_TYPES:
+        return rows
+
     for index, mesg_num, message in messages_in_order:
 
         if mesg_num not in Profile["messages"]:
@@ -46,12 +77,22 @@ def file_to_rows(path, export_sha256, loaded_at):
         if table_name not in BRONZE_FIT_TABLES:
             continue
 
-        defined_fields = {key: value for key, value in message.items() if isinstance(key,str)} 
+        field_types = field_types_for(mesg_num)
+        defined_fields = {}
+
+        for field_name, value in message.items():
+            if isinstance(field_name,str) and field_name != "developer_fields":
+                field_type = field_types.get(field_name)
+
+                if field_type in Profile["types"] and field_type not in NUMERIC_PROFILE_TYPES and isinstance(value,int):
+                    defined_fields[field_name] = str(value)
+                else:
+                    defined_fields[field_name] = value
 
         row = {
             **defined_fields,
             "_source_path": str(path.relative_to("data/raw")),
-            "_file_type": file_type,
+            "_file_type": str(file_type),
             "_message_index": index,
             "_loaded_at": loaded_at,
             "_export_sha256": export_sha256
@@ -69,3 +110,5 @@ if __name__ == "__main__":
     
     for table, table_rows in sorted(rows.items()):
         print(table, sorted(table_rows[0].keys()))
+
+    print(field_types_for(0))
