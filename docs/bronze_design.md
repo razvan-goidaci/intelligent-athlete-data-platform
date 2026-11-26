@@ -49,6 +49,7 @@ Bronze loads only the retained source scope defined in `docs/data_dictionary.md`
 
 - **Why:** the platform has a defined scope, and loading data outside it adds tables nobody uses. Bronze filters which sources it loads, but it never changes the values it loads.
 - **Trade-off:** if the scope widens later, the new sources have to be ingested again from the export ZIP. Nothing is lost, because the ZIP is kept.
+- **FIT files:** extraction writes every FIT file in the export to `data/raw/fit`, including excluded file types. The Bronze load reads each file's type from its `file_id` message and loads only the retained types: `activity`, `monitoring_b`, 49 (sleep) and 68 (HRV). A file of any other type produces no rows. Its messages are not loaded either, even when they belong to a table Bronze keeps, such as `file_id` or `device_info`.
 
 ## Decision: FIT parser
 
@@ -77,6 +78,14 @@ The rule for each option: after it is applied, can we still tell exactly what th
 
 The option names were confirmed against `garmin-fit-sdk` 21.221.0, the pinned version, which matches the profile version cited in `docs/data_dictionary.md`.
 
+### Enum values are stored as text
+
+- **Problem:** many FIT fields are enums: the device writes a code number, and the profile gives each code a name, for example `sleep_level` 3 is `deep`. `convert_types_to_strings` replaces a code with its name only when the profile defines that code, and leaves any other code as a number. The same column then holds text in some rows and numbers in others. A sample load of every 50th FIT file found this in 6 of 336 fields (for example `event.event` and `device_info.battery_status`). When all rows are in one DataFrame, Spark silently stores such a column as text. When the load writes in batches, a batch with only numbers would make the column numeric, and a later batch with text would fail.
+- **Decision:** for every field whose profile type is an enum, a value the SDK left as a number is stored as text, so 38 becomes `"38"`. The column then always holds text. A purely numeric value means a code the profile does not name.
+- **Why this is decoding, not transforming:** the stored text is exactly the code the device wrote.
+- **Which fields count as enums:** a field counts as an enum when its profile type is listed in the profile's types. Five listed types are excluded, because they are numbers with only one or two named special values: `date_time`, `local_date_time`, `message_index`, `left_right_balance` and `left_right_balance_100`. Their values stay numbers. Sub-fields such as `garmin_product` are checked by their own type.
+- **Result:** after the change, the same sample has no field with mixed types. The full load is checked again in Bronze verification.
+
 ## FIT tables
 
 Each table is named after the message's name in the official FIT profile. A message the profile does not define is named `unknown_<number>`, after its message number. Bronze does not give undefined messages a meaningful name, because that would be an interpretation. Silver can name them once their meaning is established with evidence.
@@ -102,6 +111,8 @@ Each table is named after the message's name in the official FIT profile. A mess
 Bronze loads only the message types in this table, even when a retained file contains others. The scope rule applies at every level: file types, message types and fields.
 
 The same applies to fields: a field the official profile does not define is not loaded, even inside a defined message. For example, `record` messages in this export carry several such fields, which the SDK reports by field number instead of a name. Undefined fields beyond a message's official definition, such as the extra fields in `sleep_assessment` and `hrv_status_summary`, are dropped the same way.
+
+Developer fields are not loaded either. A third-party app can add its own fields to Garmin's messages, and the SDK collects them in a nested dictionary under the key `developer_fields`. Only the app describes these fields, inside the file. Garmin's profile does not define them, so they fall under the same rule. They occur in 15 activity files.
 
 Messages the official profile does not define are not loaded, so Bronze has no `unknown_*` tables. Their meaning cannot be established from any official source, and none is needed by the coach. If that changes, they can be ingested again from the export ZIP.
 
@@ -142,7 +153,7 @@ Every FIT table gets these columns, added by the pipeline. The lineage columns f
 | Column | Holds | Why it is needed |
 |---|---|---|
 | `_source_path` | The relative path of the FIT file the message came from, inside the export. | Traces a row directly to its file, and stays unique even if two files in different folders share a name. |
-| `_file_type` | The FIT file type of that file. | The same message type can come from more than one file type, and this column tells them apart. |
+| `_file_type` | The FIT file type of that file, as text: `activity`, `monitoring_b`, `49` or `68`. | The same message type can come from more than one file type, and this column tells them apart. It is always text so it has the same type in every table, including for the two numeric types. |
 | `_message_index` | The position of the message in its file: 0 for the first message, 1 for the next, and so on. | `timestamp_16` reconstruction depends on message order. It is also part of the row key. |
 | `_loaded_at` | When the pipeline loaded the row, as a timestamp. | Identifies the pipeline run. A timestamp rather than a date keeps two runs on the same day apart. |
 | `_export_sha256` | The SHA-256 hash of the uploaded export ZIP. | Identifies the export. Load time cannot do this, because loading the same ZIP twice gives two different load times, while the hash stays the same. |
